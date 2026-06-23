@@ -1,0 +1,18 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# LeRobot local outputs / datasets / logs
+outputs/
+data/
+wandb/
