@@ -4,7 +4,7 @@ My journey building and learning with the **SO-101** robotic arms and Vision-Lan
 
 ## Contents
 
-- `daily progress/` — a daily diary of the project (`day1.md`, `day2.md`, …), English + Türkçe.
+- `daily_progress/` — a daily diary of the project (`day1.md`, `day2.md`, …), English + Türkçe.
 - `lerobot/` — the [LeRobot](https://github.com/huggingface/lerobot) library, included as a **git submodule**.
 
 ## Setup
