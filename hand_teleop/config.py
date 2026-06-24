@@ -159,11 +159,17 @@ class RobotConfig:
 
 @dataclass
 class UrdfViewConfig:
-    """Optional 3D URDF viewer (browser-based, served in-process by viser)."""
+    """Optional 3D URDF viewer (browser-based via viser).
+
+    Runs as a *separate process* (so the busy camera loop can't starve its web server) and is fed
+    joint states over a local UDP socket.
+    """
 
     enabled: bool = False
     web_host: str = "127.0.0.1"
     web_port: int = 8080
+    udp_host: str = "127.0.0.1"
+    udp_port: int = 50607
     # If a joint appears to move the opposite way in the 3D view, add its name here.
     invert_joints: tuple[str, ...] = ()
 

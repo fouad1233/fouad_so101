@@ -11,18 +11,18 @@ safety and URDF viewer are all reused unchanged. The arm drives the joints like 
 
 from __future__ import annotations
 
-import abc
 import logging
 import math
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 
-from .config import PoseConfig
+from .config import PoseConfig, TrackingConfig
 from .download import fetch
 from .features import ARM_CONNECTIONS, HandDetection, HandFeatures
-from .hand_tracking import HandDetector  # reuse the ABC
+from .hand_tracking import HandDetector, MediaPipeHandDetector  # reuse the ABC + hand backend
 
 logger = logging.getLogger(__name__)
 
@@ -171,4 +171,44 @@ class PoseArmDetector(HandDetector):
         self._landmarker.close()
 
 
-__all__ = ["PoseArmDetector", "compute_arm_features", "ensure_pose_model"]
+class CombinedArmHandDetector(HandDetector):
+    """Arm joints from Pose + a reliable gripper/roll from Hands, run together each frame.
+
+    The whole arm drives pan/lift/elbow/wrist_flex; your hand's pinch drives the **gripper** and your
+    hand roll drives **wrist_roll** (both far better than the coarse pose hand points). If the hand
+    isn't visible on a frame, the last gripper/roll values are held.
+    """
+
+    def __init__(self, pose_cfg: PoseConfig, hand_cfg: TrackingConfig):
+        self._pose = PoseArmDetector(pose_cfg)
+        self._hand = MediaPipeHandDetector(hand_cfg)
+        self._last_pinch = 0.5
+        self._last_roll = 0.0
+
+    def detect(self, frame_bgr: np.ndarray) -> HandDetection | None:
+        arm = self._pose.detect(frame_bgr)
+        if arm is None:
+            return None
+        hand = self._hand.detect(frame_bgr)
+        if hand is not None:
+            self._last_pinch = hand.features.pinch
+            self._last_roll = hand.features.roll
+        merged = replace(arm.features, pinch=self._last_pinch, roll=self._last_roll)
+        return HandDetection(
+            features=merged,
+            landmarks_px=arm.landmarks_px,
+            handedness=arm.handedness,
+            connections=arm.connections,
+        )
+
+    def close(self) -> None:
+        self._pose.close()
+        self._hand.close()
+
+
+__all__ = [
+    "PoseArmDetector",
+    "CombinedArmHandDetector",
+    "compute_arm_features",
+    "ensure_pose_model",
+]

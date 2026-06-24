@@ -74,9 +74,10 @@ the gripper is `[0, 100]`.
 - [x] 9.1 `urdf_assets.py`: download + cache the official SO-101 URDF + meshes (SO-ARM100).
 - [x] 9.2 `urdf_viewer.py`: browser-based 3D viewer using **viser** (WebGL) — robust on macOS, unlike
   native pyglet/trimesh windows. Maps normalized values onto URDF joint limits.
-- [x] 9.3 App runs the viser viewer **in-process** (background thread) and updates it each frame when
-  `--urdf-view` is set; user opens http://localhost:8080.
-- [x] 9.4 `net.py`: UDP transport kept for driving the standalone viewer from another process/machine.
+- [x] 9.3 App runs the viser viewer in a **separate process** and streams joint states to it over UDP
+  when `--urdf-view` is set; user opens http://localhost:8080. (In-process serving let the busy camera
+  loop starve viser's web server so the page wouldn't load.)
+- [x] 9.4 `net.py`: UDP `JointStatePublisher` + receiver connecting the app to the viewer process.
 - [x] 9.5 Widen mapping ranges + add per-joint active input slice (`in_lo`/`in_hi`) so joints reach
   their full range (fixes "can't go down / can't reach max").
 - [x] 9.6 `tests/test_urdf_viewer.py`: radian mapping, invert, clamping, UDP round-trip, viser load.
@@ -84,13 +85,14 @@ the gripper is `[0, 100]`.
 ### Task 10 — Whole-arm tracking ✅
 - [x] 10.1 `pose_tracking.py`: `PoseArmDetector` (MediaPipe Pose) behind the `HandDetector` interface,
   emitting the same normalized features so the whole pipeline is reused.
-- [x] 10.2 Map wrist-vs-shoulder position → pan/lift, elbow bend → elbow, forearm → wrist_flex,
-  coarse hand points → wrist_roll/gripper. `--track arm` (+ `--arm-side`) in the CLI.
+- [x] 10.2 Map wrist-vs-shoulder position → pan/lift, elbow bend → elbow, forearm → wrist_flex.
+  `--track arm` (+ `--arm-side`) in the CLI.
 - [x] 10.3 `tests/test_pose.py`: arm feature geometry (elbow extension, pan/lift signs, bounds).
 
-### Task 11 — Combined Pose + Hand (future)
-- [ ] 11.1 Run Pose (arm: pan/lift/elbow/wrist_flex) and Hands (wrist_roll + gripper) together for
-  full-fidelity control.
+### Task 11 — Combined Pose + Hand ✅
+- [x] 11.1 `CombinedArmHandDetector`: Pose (arm: pan/lift/elbow/wrist_flex) + Hands (precise
+  `wrist_roll` + `gripper`) run together. Wired to `--track arm`. Holds last gripper/roll if the hand
+  is momentarily not visible.
 
 ### Task 8 — Docs ✅
 - [x] 8.1 `requirements.txt` (Python dependencies).

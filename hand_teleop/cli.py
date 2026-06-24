@@ -71,9 +71,10 @@ def main(argv: list[str] | None = None) -> None:
     cfg = build_config(args)
     robot = make_robot(cfg.robot)
     if cfg.track == "arm":
-        from .pose_tracking import PoseArmDetector
+        # Arm joints from Pose + reliable gripper/roll from Hands.
+        from .pose_tracking import CombinedArmHandDetector
 
-        detector = PoseArmDetector(cfg.pose)
+        detector = CombinedArmHandDetector(cfg.pose, cfg.tracking)
     else:
         from .hand_tracking import MediaPipeHandDetector
 

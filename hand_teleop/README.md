@@ -34,11 +34,13 @@ natural range than hand-only:
 | Raise / lower your hand (vs shoulder)     | `shoulder_lift`  |
 | Bend / straighten your **elbow**          | `elbow_flex`     |
 | Point your forearm up / down              | `wrist_flex`     |
-| Rotate your hand (coarse)                 | `wrist_roll`     |
-| Thumb–index distance (coarse)             | `gripper`        |
+| Rotate your hand                          | `wrist_roll`     |
+| Open / close thumb–index pinch            | `gripper`        |
 
-`wrist_roll` and `gripper` come from the (noisy) pose hand points, so they're approximate in arm mode;
-the big arm joints (pan / lift / elbow) are the strength here.
+In `--track arm` mode the big joints (pan / lift / elbow / wrist_flex) come from **Pose**, while
+`wrist_roll` and `gripper` come from **Hands** running at the same time — so hand open/close controls
+the gripper just like in hand mode. Keep your hand visible to the camera; if it's momentarily lost the
+last gripper/roll value is held.
 
 ---
 
@@ -112,8 +114,9 @@ Then **open the printed URL (http://localhost:8080) in your browser** — the mo
 
 - The viewer is **browser-based** (rendered with [viser](https://github.com/nerfstudio-project/viser),
   WebGL). This is deliberately *not* a native OpenGL window: native viewers (pyglet/trimesh) are
-  unreliable on macOS, whereas a browser tab just works. The viser server runs **in-process** on a
-  background thread, so it never interferes with the camera window or the control loop.
+  unreliable on macOS, whereas a browser tab just works. It runs in a **separate process** fed joint
+  states over a local UDP socket — running it in-process makes the busy camera loop starve the web
+  server so the page won't load.
 - The URDF + meshes (TheRobotStudio/SO-ARM100) are **downloaded once** to `hand_teleop/urdf_so101/`.
 - Normalized joint values are mapped onto each URDF joint's limits, so the model spans the real range.
   Registration to the arm's exact zero is approximate; if a joint rotates the *wrong way*, set its name
@@ -240,9 +243,8 @@ hand_teleop/
 
 ## Whole-arm (body) tracking — `--track arm`
 
-Implemented in [`pose_tracking.py`](pose_tracking.py): a `PoseArmDetector` (MediaPipe **Pose**) drops in
-behind the same `HandDetector` interface, so the mapper/smoother/safety/URDF viewer are all reused. Your
-shoulder→elbow→wrist drive the big joints for a larger, more intuitive workspace than hand-only.
-
-Possible next step: run Pose **and** Hands together so the arm drives pan/lift/elbow while the hand keeps
-precise `wrist_roll` + `gripper` control.
+Implemented in [`pose_tracking.py`](pose_tracking.py): `--track arm` uses a `CombinedArmHandDetector`
+that runs MediaPipe **Pose** (shoulder→elbow→wrist → the big joints) **and** MediaPipe **Hands** (your
+pinch → `gripper`, your hand roll → `wrist_roll`) on each frame. Both drop in behind the same
+`HandDetector` interface, so the mapper/smoother/safety/URDF viewer are all reused. (Running two models
+per frame is heavier; lower `PoseConfig.complexity` to 0 if you need more FPS.)

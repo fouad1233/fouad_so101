@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
+import sys
 import time
+from pathlib import Path
 
 from .config import AppConfig, home_pose
 from .hand_tracking import HandDetector
 from .mapping import HandToJointMapper, TargetSmoother
+from .net import JointStatePublisher
 from .robot import RobotInterface
 from .visualizer import Visualizer
 
@@ -34,7 +39,8 @@ class HandTeleopApp:
         self._mapper = mapper
         self._viz = visualizer
         self._paused = False
-        self._urdf_viewer = None  # type: ignore[var-annotated]
+        self._publisher: JointStatePublisher | None = None
+        self._viewer_proc: subprocess.Popen | None = None
 
     def run(self) -> None:
         import cv2
@@ -70,8 +76,8 @@ class HandTeleopApp:
                     targets = smoother.hold()  # hand lost -> hold last safe target
 
                 positions = self._robot.send_targets(targets)
-                if self._urdf_viewer is not None:
-                    self._urdf_viewer.apply(positions)
+                if self._publisher is not None:
+                    self._publisher.publish(positions)
 
                 # smooth fps estimate
                 now = time.perf_counter()
@@ -123,23 +129,36 @@ class HandTeleopApp:
         return False
 
     def _start_urdf_viewer(self) -> None:
+        # Run the viser viewer in a SEPARATE process so the busy camera loop can't starve its web
+        # server (in-process serving makes the browser page fail to load). Feed it joint states over UDP.
         cfg = self._cfg.urdf_view
+        self._publisher = JointStatePublisher(cfg.udp_host, cfg.udp_port)
+        repo_root = str(Path(__file__).resolve().parents[1])
+        env = dict(os.environ)
+        env["PYTHONPATH"] = repo_root + os.pathsep + env.get("PYTHONPATH", "")
+        cmd = [sys.executable, "-m", "hand_teleop.urdf_viewer",
+               "--web-host", cfg.web_host, "--web-port", str(cfg.web_port),
+               "--udp-host", cfg.udp_host, "--udp-port", str(cfg.udp_port)]
+        if cfg.invert_joints:
+            cmd += ["--invert", ",".join(cfg.invert_joints)]
+        logger.info("Launching URDF viewer process -> open http://localhost:%d in your browser.",
+                    cfg.web_port)
         try:
-            from .urdf_viewer import UrdfViewer
-
-            self._urdf_viewer = UrdfViewer(
-                web_host=cfg.web_host,
-                web_port=cfg.web_port,
-                invert=set(cfg.invert_joints),
-            )
-            logger.info("URDF viewer ready -> open %s in your browser.", self._urdf_viewer.url)
+            self._viewer_proc = subprocess.Popen(cmd, cwd=repo_root, env=env)
         except Exception as e:  # never let the viewer break teleop
-            logger.warning("Could not start URDF viewer (continuing without it): %s", e)
-            self._urdf_viewer = None
+            logger.warning("Could not launch URDF viewer: %s", e)
+            self._viewer_proc = None
 
     def _stop_urdf_viewer(self) -> None:
-        if self._urdf_viewer is not None:
-            self._urdf_viewer.stop()
+        if self._publisher is not None:
+            self._publisher.close()
+        proc = self._viewer_proc
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
 
     def _shutdown(self, cap, cv2) -> None:
         try:
