@@ -155,13 +155,19 @@ class PoseArmDetector(HandDetector):
 
         side = self._pick_side(lm, vis)
         idx = _SIDES[side]
-
-        # Reject phantom arms: Pose guesses occluded joints, so require the arm to be actually visible.
-        arm_vis = vis[[idx["shoulder"], idx["elbow"], idx["wrist"]]].min()
-        if arm_vis < self._cfg.min_visibility:
-            return None
-
         pts = {role: lm[i] for role, i in idx.items()}
+
+        # Reject phantom arms: when your arm is out of shot, Pose extrapolates the joints off-screen.
+        m = self._cfg.bounds_margin
+        for role in ("elbow", "wrist"):
+            px, py = pts[role]
+            if not (-m <= px <= 1.0 + m and -m <= py <= 1.0 + m):
+                return None
+
+        # Optional, stricter visibility gate (off by default; scores are flaky for occluded poses).
+        if self._cfg.min_visibility > 0.0:
+            if vis[[idx["shoulder"], idx["elbow"], idx["wrist"]]].min() < self._cfg.min_visibility:
+                return None
 
         features = compute_arm_features(
             pts["shoulder"], pts["elbow"], pts["wrist"],

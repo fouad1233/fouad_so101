@@ -46,9 +46,10 @@ Notes:
 - `elbow_flex` (joint 3) is **inverted by default** so the robot elbow matches your elbow. Change which
   joints are flipped with `--invert-joints` (e.g. `--invert-joints ""` for none, or
   `--invert-joints elbow_flex,shoulder_pan`).
-- Pose always *guesses* occluded joints, so a detection is ignored unless your shoulder/elbow/wrist are
-  actually visible (`PoseConfig.min_visibility`, default 0.6) — this stops it tracking a phantom arm
-  when yours is out of frame.
+- Phantom-arm rejection is based on whether your **elbow/wrist fall inside the camera frame** (when
+  your arm is out of shot, Pose extrapolates them off-screen). This is reliable and won't drop a valid
+  in-frame arm. If a hard/occluded pose isn't detected, try `--pose-complexity 1` (a stronger pose
+  model). There's also an optional, stricter `--min-visibility` gate (off by default).
 
 ---
 
@@ -147,6 +148,8 @@ Then **open the printed URL (http://localhost:8080) in your browser** — the mo
 --track hand|arm            track your hand or your whole arm (default: hand)
 --arm-side auto|left|right   which arm to follow in --track arm (default: auto)
 --invert-joints LIST        flip a joint's direction (default: elbow_flex; '' = none)
+--pose-complexity 0|1|2     arm model: 0=lite (fast), 1=full, 2=heavy (default: 0)
+--min-visibility F          extra arm-visibility gate, 0=off (default: 0)
 --camera N                  webcam index (default: 0)
 --max-relative-target F     per-command joint cap, normalized units (default: 12) — lower = gentler
 --ema-alpha F               smoothing 0..1, higher = snappier (default: 0.35)

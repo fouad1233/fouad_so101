@@ -24,6 +24,8 @@ def build_config(args: argparse.Namespace) -> AppConfig:
     cfg.urdf_view.enabled = args.urdf_view
     cfg.track = args.track
     cfg.pose.side = args.arm_side
+    cfg.pose.complexity = args.pose_complexity
+    cfg.pose.min_visibility = args.min_visibility
     # Flip the command direction of any listed joints (e.g. elbow_flex by default).
     for name in (j.strip() for j in args.invert_joints.split(",")):
         if name in cfg.mapping.joint_maps:
@@ -53,6 +55,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--invert-joints", default="elbow_flex",
                    help="Comma-separated joints whose direction to flip (default: elbow_flex). "
                         "Pass '' for none, or e.g. 'elbow_flex,shoulder_pan'.")
+    p.add_argument("--pose-complexity", type=int, choices=[0, 1, 2], default=0,
+                   help="Pose model: 0=lite (fast), 1=full, 2=heavy. Use 1 for hard/occluded poses.")
+    p.add_argument("--min-visibility", type=float, default=0.0,
+                   help="Extra arm-visibility gate (0=off). Raise to ~0.5 only if phantom arms persist.")
     p.add_argument("--camera", type=int, default=0, help="Webcam index (default: 0).")
     p.add_argument("--max-relative-target", type=float, default=12.0,
                    help="Max per-command joint change, normalized units (safety cap; default: 12).")

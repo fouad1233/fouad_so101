@@ -134,9 +134,13 @@ class PoseConfig:
     side: str = "auto"           # "auto" | "left" | "right" (the person's arm to follow)
     min_detection_confidence: float = 0.6
     min_tracking_confidence: float = 0.6
-    # Pose always *guesses* occluded joints, so reject a detection unless the shoulder/elbow/wrist
-    # are actually visible enough. Raise this if it tracks a phantom arm when yours is out of frame.
-    min_visibility: float = 0.6
+    # Phantom-arm rejection: when your arm is out of shot, Pose extrapolates the joints *outside* the
+    # frame, so reject a detection whose elbow/wrist land beyond [-margin, 1+margin]. Reliable and
+    # doesn't reject in-frame arms.
+    bounds_margin: float = 0.12
+    # Optional extra gate on landmark visibility (0 = off; visibility scores are unreliable for
+    # self-occluding poses, so it's off by default). Raise toward ~0.5 only if phantom arms persist.
+    min_visibility: float = 0.0
     # pan/lift come from the wrist position relative to the shoulder, normalized by arm length.
     # ~1.3 means a comfortable (not fully extended) arm sweep already spans the joint range.
     pan_gain: float = 1.3
