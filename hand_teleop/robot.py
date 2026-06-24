@@ -123,7 +123,11 @@ class SO101RobotController(RobotInterface):
 
 
 def make_robot(cfg: RobotConfig) -> RobotInterface:
-    """Pick the back-end: real SO-101 if a port is configured, else simulation."""
+    """Pick the back-end: real SO-101 if a port is configured, else simulation.
+
+    In simulation there's no hardware to protect, so the sim tracks the (already smoothed) targets
+    directly for a responsive preview. The real driver keeps its ``max_relative_target`` safety cap.
+    """
     if cfg.port:
         return SO101RobotController(cfg)
-    return SimulatedRobot(max_relative_target=cfg.max_relative_target)
+    return SimulatedRobot(max_relative_target=1e9)

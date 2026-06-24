@@ -83,8 +83,8 @@ class MappingConfig:
 class SmoothingConfig:
     """Exponential smoothing + per-tick rate limit applied to joint targets."""
 
-    ema_alpha: float = 0.35   # 0..1; higher = more responsive, lower = smoother
-    max_step: float = 6.0     # max change per control tick, in normalized units
+    ema_alpha: float = 0.5    # 0..1; higher = more responsive, lower = smoother
+    max_step: float = 15.0    # max change per control tick, in normalized units
 
 
 @dataclass
@@ -130,7 +130,7 @@ class TrackingConfig:
 class PoseConfig:
     """Whole-arm tracking (MediaPipe Pose). Used when ``track == 'arm'``."""
 
-    complexity: int = 1          # 0=lite, 1=full, 2=heavy (bigger = more accurate, slower)
+    complexity: int = 0          # 0=lite, 1=full, 2=heavy (lite keeps FPS up in combined arm+hand mode)
     side: str = "auto"           # "auto" | "left" | "right" (the person's arm to follow)
     min_detection_confidence: float = 0.6
     min_tracking_confidence: float = 0.6
