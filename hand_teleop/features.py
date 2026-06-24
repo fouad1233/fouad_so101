@@ -20,14 +20,11 @@ HAND_CONNECTIONS: tuple[tuple[int, int], ...] = (
     (0, 17),                                   # palm base
 )
 
-# Topology for the arm skeleton drawn in "arm" mode, over a 6-point array:
-# [shoulder, elbow, wrist, thumb, index, pinky].
+# Topology for the arm skeleton drawn in "arm" mode, over a 3-point array: [shoulder, elbow, wrist].
+# (The hand itself is drawn separately from the real 21-point Hands model.)
 ARM_CONNECTIONS: tuple[tuple[int, int], ...] = (
     (0, 1),  # upper arm: shoulder -> elbow
     (1, 2),  # forearm: elbow -> wrist
-    (2, 3),  # wrist -> thumb
-    (2, 4),  # wrist -> index
-    (4, 5),  # index -> pinky (knuckle line)
 )
 
 

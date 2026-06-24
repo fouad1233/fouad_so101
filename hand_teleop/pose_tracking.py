@@ -168,8 +168,9 @@ class PoseArmDetector(HandDetector):
             pts["thumb"], pts["index"], pts["pinky"], self._cfg,
         )
 
-        # 6-point skeleton for drawing: [shoulder, elbow, wrist, thumb, index, pinky]
-        order = ["shoulder", "elbow", "wrist", "thumb", "index", "pinky"]
+        # Arm skeleton for drawing: just [shoulder, elbow, wrist]. The hand is drawn separately from
+        # the real 21-point Hands model (the coarse pose hand points were confusing and unused here).
+        order = ["shoulder", "elbow", "wrist"]
         skel = np.array([[pts[r][0] * w, pts[r][1] * h] for r in order], dtype=np.int32)
         return HandDetection(
             features=features,

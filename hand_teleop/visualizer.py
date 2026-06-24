@@ -18,6 +18,8 @@ GREEN = (80, 220, 120)
 CYAN = (220, 200, 60)
 ORANGE = (60, 170, 245)
 RED = (60, 60, 235)
+MAGENTA = (220, 80, 220)   # hand overlay lines
+YELLOW = (60, 230, 240)    # hand overlay joints
 PANEL = (35, 35, 35)
 
 
@@ -52,18 +54,20 @@ class Visualizer:
 
     # --- hand / arm skeleton --------------------------------------------
     def _draw_hand(self, frame: np.ndarray, det: HandDetection) -> None:
-        self._draw_skeleton(frame, det.landmarks_px, det.connections)
-        for pts, conns in det.overlays:  # e.g. the full 5-finger hand in arm mode
-            self._draw_skeleton(frame, pts, conns)
+        # main skeleton (hand in hand-mode, arm in arm-mode) in cyan/green
+        self._draw_skeleton(frame, det.landmarks_px, det.connections, CYAN, GREEN, 2, 4)
+        # extra skeletons (the real 5-finger hand in arm mode) in magenta/yellow so it's distinct
+        for pts, conns in det.overlays:
+            self._draw_skeleton(frame, pts, conns, MAGENTA, YELLOW, 2, 3)
 
     @staticmethod
-    def _draw_skeleton(frame, pts, connections) -> None:
+    def _draw_skeleton(frame, pts, connections, line_color, dot_color, thickness, radius) -> None:
         n = len(pts)
         for a, b in connections:
             if a < n and b < n:
-                cv2.line(frame, tuple(pts[a]), tuple(pts[b]), CYAN, 2, cv2.LINE_AA)
+                cv2.line(frame, tuple(pts[a]), tuple(pts[b]), line_color, thickness, cv2.LINE_AA)
         for x, y in pts:
-            cv2.circle(frame, (int(x), int(y)), 4, GREEN, -1, cv2.LINE_AA)
+            cv2.circle(frame, (int(x), int(y)), radius, dot_color, -1, cv2.LINE_AA)
 
     # --- joint bars ------------------------------------------------------
     def _draw_joint_panel(self, frame, targets, positions) -> None:
