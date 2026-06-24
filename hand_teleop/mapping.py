@@ -26,7 +26,9 @@ class HandToJointMapper:
         out: dict[str, float] = {}
         for motor, jm in self._mapping.joint_maps.items():
             value = getattr(features, jm.feature)
-            lo, hi = FEATURE_DOMAINS[jm.feature]
+            domain_lo, domain_hi = FEATURE_DOMAINS[jm.feature]
+            lo = jm.in_lo if jm.in_lo is not None else domain_lo
+            hi = jm.in_hi if jm.in_hi is not None else domain_hi
             t = (value - lo) / (hi - lo) if hi > lo else 0.0
             t = _clamp(t, 0.0, 1.0)
             if jm.invert:

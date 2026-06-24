@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
+import sys
 import time
+from pathlib import Path
 
 from .config import AppConfig, home_pose
 from .hand_tracking import HandDetector
 from .mapping import HandToJointMapper, TargetSmoother
+from .net import JointStatePublisher
 from .robot import RobotInterface
 from .visualizer import Visualizer
 
@@ -34,12 +39,16 @@ class HandTeleopApp:
         self._mapper = mapper
         self._viz = visualizer
         self._paused = False
+        self._publisher: JointStatePublisher | None = None
+        self._viewer_proc: subprocess.Popen | None = None
 
     def run(self) -> None:
         import cv2
 
         cap = self._open_camera(cv2)
         self._robot.connect()
+        if self._cfg.urdf_view.enabled:
+            self._start_urdf_viewer()
         # Seed targets from the live arm position so the first commands cause no jump.
         smoother = TargetSmoother(self._cfg.smoothing, self._robot.read_positions())
         window = "SO-101 hand teleop"
@@ -67,6 +76,8 @@ class HandTeleopApp:
                     targets = smoother.hold()  # hand lost -> hold last safe target
 
                 positions = self._robot.send_targets(targets)
+                if self._publisher is not None:
+                    self._publisher.publish(positions)
 
                 # smooth fps estimate
                 now = time.perf_counter()
@@ -117,10 +128,39 @@ class HandTeleopApp:
             logger.info("Set target to home pose.")
         return False
 
+    def _start_urdf_viewer(self) -> None:
+        cfg = self._cfg.urdf_view
+        self._publisher = JointStatePublisher(cfg.host, cfg.port)
+        repo_root = str(Path(__file__).resolve().parents[1])
+        env = dict(os.environ)
+        env["PYTHONPATH"] = repo_root + os.pathsep + env.get("PYTHONPATH", "")
+        cmd = [sys.executable, "-m", "hand_teleop.urdf_viewer", "--host", cfg.host,
+               "--port", str(cfg.port)]
+        if cfg.invert_joints:
+            cmd += ["--invert", ",".join(cfg.invert_joints)]
+        logger.info("Launching URDF viewer (separate window): %s", " ".join(cmd))
+        try:
+            self._viewer_proc = subprocess.Popen(cmd, cwd=repo_root, env=env)
+        except Exception as e:  # never let the viewer break teleop
+            logger.warning("Could not launch URDF viewer: %s", e)
+            self._viewer_proc = None
+
+    def _stop_urdf_viewer(self) -> None:
+        if self._publisher is not None:
+            self._publisher.close()
+        proc = self._viewer_proc
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
     def _shutdown(self, cap, cv2) -> None:
         try:
             self._robot.disconnect()
         finally:
+            self._stop_urdf_viewer()
             self._detector.close()
             cap.release()
             if self._cfg.show_window:

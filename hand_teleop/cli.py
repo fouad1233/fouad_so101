@@ -22,6 +22,7 @@ def build_config(args: argparse.Namespace) -> AppConfig:
     cfg.robot.port = args.port
     cfg.robot.id = args.id
     cfg.robot.max_relative_target = args.max_relative_target
+    cfg.urdf_view.enabled = args.urdf_view
     if args.ema_alpha is not None:
         cfg.smoothing.ema_alpha = args.ema_alpha
     if args.max_step is not None:
@@ -46,6 +47,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="Smoothing responsiveness 0..1 (higher = snappier; default: 0.35).")
     p.add_argument("--max-step", type=float, default=None,
                    help="Max target change per control tick (default: 6).")
+    p.add_argument("--urdf-view", action="store_true",
+                   help="Open a real 3D SO-101 URDF viewer (separate window) that follows the joints.")
     p.add_argument("--no-window", action="store_true", help="Run without the OpenCV window.")
     p.add_argument("--no-schematic", action="store_true", help="Hide the arm schematic overlay.")
     p.add_argument("--no-mirror", action="store_true", help="Do not mirror the camera image.")

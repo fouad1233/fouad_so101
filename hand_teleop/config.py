@@ -37,12 +37,20 @@ FEATURE_DOMAINS: dict[str, tuple[float, float]] = {
 
 @dataclass
 class JointMap:
-    """Linear map from one hand feature to one joint's safe output sub-range."""
+    """Linear map from one hand feature to one joint's safe output sub-range.
+
+    ``in_lo``/``in_hi`` define the *active* part of the feature's domain that spans the full output
+    range. Narrowing it (e.g. y over [0.2, 0.85] instead of [0, 1]) means you reach the joint's limits
+    with comfortable hand motion, without having to push to the very edge of the frame. If left as
+    ``None`` the full feature domain (``FEATURE_DOMAINS``) is used.
+    """
 
     feature: str
     out_min: float
     out_max: float
     invert: bool = False
+    in_lo: float | None = None
+    in_hi: float | None = None
 
 
 @dataclass
@@ -56,17 +64,17 @@ class MappingConfig:
     joint_maps: dict[str, JointMap] = field(
         default_factory=lambda: {
             # hand moves left/right  -> base pan
-            "shoulder_pan": JointMap("x", -60.0, 60.0, invert=False),
+            "shoulder_pan": JointMap("x", -90.0, 90.0, invert=False, in_lo=0.15, in_hi=0.85),
             # hand moves up/down     -> shoulder lift (invert: hand up => arm up)
-            "shoulder_lift": JointMap("y", -45.0, 45.0, invert=True),
+            "shoulder_lift": JointMap("y", -60.0, 60.0, invert=True, in_lo=0.20, in_hi=0.85),
             # hand near/far          -> elbow reach
-            "elbow_flex": JointMap("depth", -55.0, 55.0, invert=False),
+            "elbow_flex": JointMap("depth", -75.0, 75.0, invert=False, in_lo=0.10, in_hi=0.90),
             # hand points up/down    -> wrist flex
-            "wrist_flex": JointMap("pitch", -55.0, 55.0, invert=False),
+            "wrist_flex": JointMap("pitch", -75.0, 75.0, invert=False, in_lo=-0.80, in_hi=0.80),
             # hand roll              -> wrist roll
-            "wrist_roll": JointMap("roll", -85.0, 85.0, invert=False),
+            "wrist_roll": JointMap("roll", -90.0, 90.0, invert=False, in_lo=-0.90, in_hi=0.90),
             # fingers open/close     -> gripper
-            "gripper": JointMap("pinch", 5.0, 95.0, invert=False),
+            "gripper": JointMap("pinch", 3.0, 97.0, invert=False, in_lo=0.05, in_hi=0.95),
         }
     )
 
@@ -130,6 +138,17 @@ class RobotConfig:
 
 
 @dataclass
+class UrdfViewConfig:
+    """Optional 3D URDF viewer (separate process, fed joint states over local UDP)."""
+
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 50607
+    # If a joint appears to move the opposite way in the 3D view, add its name here.
+    invert_joints: tuple[str, ...] = ()
+
+
+@dataclass
 class AppConfig:
     camera_index: int = 0
     frame_width: int = 1280
@@ -144,6 +163,7 @@ class AppConfig:
     smoothing: SmoothingConfig = field(default_factory=SmoothingConfig)
     safety: SafetyConfig = field(default_factory=SafetyConfig)
     robot: RobotConfig = field(default_factory=RobotConfig)
+    urdf_view: UrdfViewConfig = field(default_factory=UrdfViewConfig)
 
 
 def home_pose() -> dict[str, float]:

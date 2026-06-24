@@ -18,8 +18,9 @@ your detected hand and a schematic of how the arm will move. No leader arm requi
 | Roll / rotate your hand           | `wrist_roll`     | roll    |
 | Open / close thumb–index pinch    | `gripper`        | pinch   |
 
-Each feature is mapped linearly into a **conservative, safe sub-range** of the joint and then smoothed.
-You can re-map or re-scale everything in [`config.py`](config.py).
+Each feature is mapped linearly into a safe sub-range of the joint and then smoothed. Each joint also
+has an *active input slice* (`in_lo`/`in_hi`) so you reach its full range with comfortable hand motion
+instead of pushing to the edge of the frame. Re-map or re-scale everything in [`config.py`](config.py).
 
 ---
 
@@ -76,6 +77,24 @@ python -m hand_teleop --port /dev/tty.usbmodem5B421352311 --id my_follower
 Use your follower's port (from `lerobot-find-port`, recorded in `../myport.txxt`) and the `--robot.id`
 you calibrated with.
 
+### 3) Real 3D URDF view (accurate joint visualization)
+
+Add `--urdf-view` to open a second window with the **official SO-101 URDF** rendered in 3D, following
+the joints (far more accurate than the lightweight 2D schematic in the camera window):
+
+```bash
+python -m hand_teleop --urdf-view                 # simulation + 3D URDF window
+python -m hand_teleop --urdf-view --port /dev/tty.usbmodem5B421352311 --id my_follower
+```
+
+- The URDF + meshes (TheRobotStudio/SO-ARM100) are **downloaded once** to `hand_teleop/urdf_so101/`.
+- The viewer runs as a **separate process**, fed joint states over a local UDP socket, so it never
+  interferes with the camera window or the control loop.
+- You can also run it on its own (it just waits for joint states): `python -m hand_teleop.urdf_viewer`.
+- Normalized joint values are mapped onto each URDF joint's limits, so the model spans the real range.
+  Registration to the arm's exact zero is approximate; if a joint rotates the *wrong way*, run the
+  viewer with e.g. `python -m hand_teleop.urdf_viewer --invert shoulder_pan,wrist_roll`.
+
 ### Controls (in the window)
 
 | Key       | Action                                  |
@@ -93,7 +112,8 @@ you calibrated with.
 --max-relative-target F     per-command joint cap, normalized units (default: 12) — lower = gentler
 --ema-alpha F               smoothing 0..1, higher = snappier (default: 0.35)
 --max-step F                max target change per tick (default: 6)
---no-schematic              hide the arm schematic overlay
+--urdf-view                 open the real 3D SO-101 URDF viewer (separate window)
+--no-schematic              hide the 2D arm schematic overlay
 --no-mirror                 do not mirror the camera image
 -v                          verbose logging
 ```
@@ -147,6 +167,14 @@ headless pipeline run (mock hand → mapper → smoother → simulated robot) �
 - **Arm too sluggish** — raise `--ema-alpha` (toward 1) and `--max-step`.
 - **Depth/pinch feel off** — tune `DepthCalibration` / `PinchCalibration` in `config.py` to your
   camera distance and hand size.
+- **Can't reach a joint's full range** — each joint maps from an *active* slice of its hand feature
+  (`in_lo`/`in_hi` in `config.py` → `MappingConfig`). Widen the output range (`out_min`/`out_max`) or
+  the active input slice for that joint.
+- **A joint rotates the wrong way in the 3D view** — `python -m hand_teleop.urdf_viewer --invert <joint>`
+  (or set `UrdfViewConfig.invert_joints`). To flip the *commanded* direction on the real arm instead,
+  toggle that joint's `invert` in `MappingConfig`.
+- **3D window doesn't open** — ensure `yourdfpy` is installed (`pip install -r requirements.txt`); the
+  first run also needs internet to download the URDF/meshes.
 
 ---
 
@@ -164,13 +192,25 @@ hand_teleop/
 ├── robot.py           # RobotInterface + SO101RobotController + SimulatedRobot
 ├── kinematics.py      # ArmSchematic (2D forward kinematics for the overlay)
 ├── visualizer.py      # OpenCV overlay (hand, joint bars, schematic)
+├── urdf_assets.py     # downloads/caches the SO-101 URDF + meshes
+├── urdf_viewer.py     # 3D URDF viewer process (yourdfpy), UDP-driven
+├── net.py             # UDP JointStatePublisher / receiver
 ├── app.py             # HandTeleopApp control loop
 ├── cli.py / __main__  # command-line entry point
 └── tests/             # headless unit + pipeline tests
 ```
 
-## Future: real URDF/3D view
+## Visualization: 2D schematic vs 3D URDF
 
-The on-screen arm is a lightweight **2D schematic** (no extra heavy dependencies, disk-friendly). A
-true URDF + mesh 3D view could be added with the [SO-ARM100 URDF](https://github.com/TheRobotStudio/SO-ARM100)
-plus a viewer such as `rerun` or `pybullet`, driven by the same joint targets this app already computes.
+- The **camera window** always draws a lightweight **2D schematic** (no extra deps) for at-a-glance
+  feedback.
+- Adding **`--urdf-view`** opens the accurate **3D URDF** model (the official
+  [SO-ARM100](https://github.com/TheRobotStudio/SO-ARM100) SO-101 URDF via `yourdfpy`), driven by the
+  same joint targets over UDP.
+
+## Future: whole-arm (body) tracking
+
+Hand-only tracking has a limited, fiddly range (you noticed you can't always reach a joint's max). A
+natural next step is **whole-arm tracking** with MediaPipe **Pose** (shoulder→elbow→wrist landmarks),
+mapping your physical arm onto the robot arm for a larger, more intuitive workspace. The
+`HandDetector` interface is designed so a `PoseArmDetector` can drop in as an alternative back-end.
