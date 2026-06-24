@@ -127,6 +127,26 @@ class TrackingConfig:
 
 
 @dataclass
+class PoseConfig:
+    """Whole-arm tracking (MediaPipe Pose). Used when ``track == 'arm'``."""
+
+    complexity: int = 1          # 0=lite, 1=full, 2=heavy (bigger = more accurate, slower)
+    side: str = "auto"           # "auto" | "left" | "right" (the person's arm to follow)
+    min_detection_confidence: float = 0.6
+    min_tracking_confidence: float = 0.6
+    # pan/lift come from the wrist position *relative to the shoulder* (robust to where you stand).
+    pan_gain: float = 1.9
+    lift_gain: float = 1.9
+    # elbow extension from the interior elbow angle (radians): bent -> 0, straight -> 1.
+    elbow_bent_rad: float = 0.7      # ~40 deg
+    elbow_straight_rad: float = 2.9  # ~166 deg
+    pitch_gain: float = 1.2          # forearm up/down -> wrist flex
+    # crude gripper proxy from the (noisy) pose hand points: thumb-index distance / forearm length.
+    pinch_closed: float = 0.05
+    pinch_open: float = 0.25
+
+
+@dataclass
 class RobotConfig:
     """Settings for the real SO-101 follower (ignored in simulation mode)."""
 
@@ -157,8 +177,10 @@ class AppConfig:
     show_window: bool = True
     show_schematic: bool = True
     control_hz: float = 30.0     # upper bound on control loop rate
+    track: str = "hand"          # "hand" or "arm"
 
     tracking: TrackingConfig = field(default_factory=TrackingConfig)
+    pose: PoseConfig = field(default_factory=PoseConfig)
     mapping: MappingConfig = field(default_factory=MappingConfig)
     smoothing: SmoothingConfig = field(default_factory=SmoothingConfig)
     safety: SafetyConfig = field(default_factory=SafetyConfig)

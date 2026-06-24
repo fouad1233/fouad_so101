@@ -20,6 +20,16 @@ HAND_CONNECTIONS: tuple[tuple[int, int], ...] = (
     (0, 17),                                   # palm base
 )
 
+# Topology for the arm skeleton drawn in "arm" mode, over a 6-point array:
+# [shoulder, elbow, wrist, thumb, index, pinky].
+ARM_CONNECTIONS: tuple[tuple[int, int], ...] = (
+    (0, 1),  # upper arm: shoulder -> elbow
+    (1, 2),  # forearm: elbow -> wrist
+    (2, 3),  # wrist -> thumb
+    (2, 4),  # wrist -> index
+    (4, 5),  # index -> pinky (knuckle line)
+)
+
 
 @dataclass
 class HandFeatures:
@@ -38,8 +48,9 @@ class HandFeatures:
 
 @dataclass
 class HandDetection:
-    """Result of running the detector on one frame."""
+    """Result of running a detector on one frame (hand or arm)."""
 
     features: HandFeatures
-    landmarks_px: np.ndarray  # shape (21, 2), pixel coordinates for drawing
-    handedness: str | None    # "Left" / "Right" / None
+    landmarks_px: np.ndarray              # (N, 2) pixel coordinates for drawing
+    handedness: str | None = None        # "Left" / "Right" / None
+    connections: tuple[tuple[int, int], ...] = HAND_CONNECTIONS  # topology for drawing

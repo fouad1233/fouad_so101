@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from .config import MOTORS, SafetyConfig
-from .features import HAND_CONNECTIONS, HandDetection
+from .features import HandDetection
 from .kinematics import ArmSchematic
 
 # BGR colors
@@ -50,13 +50,15 @@ class Visualizer:
         self._draw_status(frame, detection, info)
         return frame
 
-    # --- hand skeleton ---------------------------------------------------
+    # --- hand / arm skeleton --------------------------------------------
     def _draw_hand(self, frame: np.ndarray, det: HandDetection) -> None:
         pts = det.landmarks_px
-        for a, b in HAND_CONNECTIONS:
-            cv2.line(frame, tuple(pts[a]), tuple(pts[b]), CYAN, 2, cv2.LINE_AA)
+        n = len(pts)
+        for a, b in det.connections:
+            if a < n and b < n:
+                cv2.line(frame, tuple(pts[a]), tuple(pts[b]), CYAN, 2, cv2.LINE_AA)
         for x, y in pts:
-            cv2.circle(frame, (int(x), int(y)), 3, GREEN, -1, cv2.LINE_AA)
+            cv2.circle(frame, (int(x), int(y)), 4, GREEN, -1, cv2.LINE_AA)
 
     # --- joint bars ------------------------------------------------------
     def _draw_joint_panel(self, frame, targets, positions) -> None:
@@ -134,6 +136,6 @@ class Visualizer:
         if paused:
             _font(frame, "PAUSED (hold)", (w // 2 - 90, 34), 0.7, ORANGE, 2)
         elif detection is None:
-            _font(frame, "no hand - holding", (w // 2 - 110, 34), 0.7, RED, 2)
+            _font(frame, "no target - holding", (w // 2 - 120, 34), 0.7, RED, 2)
 
         _font(frame, "[q] quit   [space] pause/hold   [h] home", (12, h - 14), 0.5, WHITE)

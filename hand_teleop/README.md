@@ -1,7 +1,8 @@
 # Hand-Tracking Teleoperation for the SO-101 (follower)
 
-Control your **SO-101 follower** arm by moving your **hand in front of a webcam**. A live window shows
-your detected hand and a schematic of how the arm will move. No leader arm required.
+Control your **SO-101 follower** arm with a **webcam** — track either your **hand** (MediaPipe Hands)
+or your **whole arm** (MediaPipe Pose). A live window shows the detection and a schematic of how the
+arm will move; add `--urdf-view` for an accurate 3D model. No leader arm required.
 
 > See [`plan.md`](plan.md) for the design/architecture and the task breakdown.
 
@@ -21,6 +22,23 @@ your detected hand and a schematic of how the arm will move. No leader arm requi
 Each feature is mapped linearly into a safe sub-range of the joint and then smoothed. Each joint also
 has an *active input slice* (`in_lo`/`in_hi`) so you reach its full range with comfortable hand motion
 instead of pushing to the edge of the frame. Re-map or re-scale everything in [`config.py`](config.py).
+
+### Whole-arm mode (`--track arm`)
+
+With `--track arm` the same joints are driven by your **whole arm** (MediaPipe Pose) — a bigger, more
+natural range than hand-only:
+
+| Your arm movement                         | SO-101 joint     |
+|-------------------------------------------|------------------|
+| Move your hand left / right (vs shoulder) | `shoulder_pan`   |
+| Raise / lower your hand (vs shoulder)     | `shoulder_lift`  |
+| Bend / straighten your **elbow**          | `elbow_flex`     |
+| Point your forearm up / down              | `wrist_flex`     |
+| Rotate your hand (coarse)                 | `wrist_roll`     |
+| Thumb–index distance (coarse)             | `gripper`        |
+
+`wrist_roll` and `gripper` come from the (noisy) pose hand points, so they're approximate in arm mode;
+the big arm joints (pan / lift / elbow) are the strength here.
 
 ---
 
@@ -62,11 +80,14 @@ source .venv/bin/activate
 ### 1) Simulation first (no hardware) — always start here
 
 ```bash
-python -m hand_teleop
+python -m hand_teleop                 # hand tracking
+python -m hand_teleop --track arm      # whole-arm tracking (MediaPipe Pose)
 ```
 
-A window opens showing your hand and a simulated SO-101 reacting to it. Use this to check the camera,
-the detection, and that each joint moves the way you expect **before** touching the real arm.
+A window opens showing your hand/arm and a simulated SO-101 reacting to it. Use this to check the
+camera, the detection, and that each joint moves the way you expect **before** touching the real arm.
+First `--track arm` run downloads the pose model (~9 MB). Stand back far enough that your shoulder,
+elbow and wrist are all in frame.
 
 ### 2) Real robot
 
@@ -112,6 +133,8 @@ Then **open the printed URL (http://localhost:8080) in your browser** — the mo
 ```
 --port PORT                 SO-101 serial port (omit => simulation)
 --id ID                     calibration id (default: my_follower)
+--track hand|arm            track your hand or your whole arm (default: hand)
+--arm-side auto|left|right   which arm to follow in --track arm (default: auto)
 --camera N                  webcam index (default: 0)
 --max-relative-target F     per-command joint cap, normalized units (default: 12) — lower = gentler
 --ema-alpha F               smoothing 0..1, higher = snappier (default: 0.35)
@@ -193,6 +216,8 @@ hand_teleop/
 ├── config.py          # all tunables (mapping, smoothing, safety, robot, app)
 ├── features.py        # HandFeatures dataclass + hand topology
 ├── hand_tracking.py   # HandDetector ABC + MediaPipeHandDetector
+├── pose_tracking.py   # PoseArmDetector (whole-arm, MediaPipe Pose)
+├── download.py        # shared HTTPS model/asset downloader
 ├── mapping.py         # HandToJointMapper + TargetSmoother
 ├── robot.py           # RobotInterface + SO101RobotController + SimulatedRobot
 ├── kinematics.py      # ArmSchematic (2D forward kinematics for the overlay)
@@ -213,9 +238,11 @@ hand_teleop/
   [SO-ARM100](https://github.com/TheRobotStudio/SO-ARM100) SO-101 URDF) in your browser via `viser`,
   driven by the same joint targets.
 
-## Future: whole-arm (body) tracking
+## Whole-arm (body) tracking — `--track arm`
 
-Hand-only tracking has a limited, fiddly range (you noticed you can't always reach a joint's max). A
-natural next step is **whole-arm tracking** with MediaPipe **Pose** (shoulder→elbow→wrist landmarks),
-mapping your physical arm onto the robot arm for a larger, more intuitive workspace. The
-`HandDetector` interface is designed so a `PoseArmDetector` can drop in as an alternative back-end.
+Implemented in [`pose_tracking.py`](pose_tracking.py): a `PoseArmDetector` (MediaPipe **Pose**) drops in
+behind the same `HandDetector` interface, so the mapper/smoother/safety/URDF viewer are all reused. Your
+shoulder→elbow→wrist drive the big joints for a larger, more intuitive workspace than hand-only.
+
+Possible next step: run Pose **and** Hands together so the arm drives pan/lift/elbow while the hand keeps
+precise `wrist_roll` + `gripper` control.

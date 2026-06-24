@@ -81,9 +81,16 @@ the gripper is `[0, 100]`.
   their full range (fixes "can't go down / can't reach max").
 - [x] 9.6 `tests/test_urdf_viewer.py`: radian mapping, invert, clamping, UDP round-trip, viser load.
 
-### Task 10 — Whole-arm tracking (future)
-- [ ] 10.1 Add a `PoseArmDetector` (MediaPipe Pose: shoulder→elbow→wrist) behind the `HandDetector`
-  interface, mapping the physical arm to the robot for a larger, more natural range.
+### Task 10 — Whole-arm tracking ✅
+- [x] 10.1 `pose_tracking.py`: `PoseArmDetector` (MediaPipe Pose) behind the `HandDetector` interface,
+  emitting the same normalized features so the whole pipeline is reused.
+- [x] 10.2 Map wrist-vs-shoulder position → pan/lift, elbow bend → elbow, forearm → wrist_flex,
+  coarse hand points → wrist_roll/gripper. `--track arm` (+ `--arm-side`) in the CLI.
+- [x] 10.3 `tests/test_pose.py`: arm feature geometry (elbow extension, pan/lift signs, bounds).
+
+### Task 11 — Combined Pose + Hand (future)
+- [ ] 11.1 Run Pose (arm: pan/lift/elbow/wrist_flex) and Hands (wrist_roll + gripper) together for
+  full-fidelity control.
 
 ### Task 8 — Docs ✅
 - [x] 8.1 `requirements.txt` (Python dependencies).

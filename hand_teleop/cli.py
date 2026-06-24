@@ -7,7 +7,6 @@ import logging
 
 from .app import HandTeleopApp
 from .config import AppConfig
-from .hand_tracking import MediaPipeHandDetector
 from .mapping import HandToJointMapper
 from .robot import make_robot
 from .visualizer import Visualizer
@@ -23,6 +22,8 @@ def build_config(args: argparse.Namespace) -> AppConfig:
     cfg.robot.id = args.id
     cfg.robot.max_relative_target = args.max_relative_target
     cfg.urdf_view.enabled = args.urdf_view
+    cfg.track = args.track
+    cfg.pose.side = args.arm_side
     if args.ema_alpha is not None:
         cfg.smoothing.ema_alpha = args.ema_alpha
     if args.max_step is not None:
@@ -40,6 +41,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         "If omitted, runs in SIMULATION mode (no hardware).")
     p.add_argument("--id", default="my_follower",
                    help="Calibration id used with `lerobot-calibrate` (default: my_follower).")
+    p.add_argument("--track", choices=["hand", "arm"], default="hand",
+                   help="Track your hand (MediaPipe Hands) or your whole arm (MediaPipe Pose).")
+    p.add_argument("--arm-side", choices=["auto", "left", "right"], default="auto",
+                   help="Which arm to follow in --track arm mode (default: auto).")
     p.add_argument("--camera", type=int, default=0, help="Webcam index (default: 0).")
     p.add_argument("--max-relative-target", type=float, default=12.0,
                    help="Max per-command joint change, normalized units (safety cap; default: 12).")
@@ -65,12 +70,19 @@ def main(argv: list[str] | None = None) -> None:
 
     cfg = build_config(args)
     robot = make_robot(cfg.robot)
-    detector = MediaPipeHandDetector(cfg.tracking)
+    if cfg.track == "arm":
+        from .pose_tracking import PoseArmDetector
+
+        detector = PoseArmDetector(cfg.pose)
+    else:
+        from .hand_tracking import MediaPipeHandDetector
+
+        detector = MediaPipeHandDetector(cfg.tracking)
     mapper = HandToJointMapper(cfg.mapping, cfg.safety)
     visualizer = Visualizer(cfg.safety, show_schematic=cfg.show_schematic) if cfg.show_window else None
 
     mode = "SIMULATION" if cfg.robot.port is None else f"ROBOT on {cfg.robot.port}"
-    logging.info("Starting hand teleop in %s mode.", mode)
+    logging.info("Starting teleop (%s tracking) in %s mode.", cfg.track, mode)
     HandTeleopApp(cfg, robot, detector, mapper, visualizer).run()
 
 
