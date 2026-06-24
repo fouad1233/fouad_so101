@@ -1,0 +1,6 @@
+# Downloaded MediaPipe model bundle (auto-fetched on first run)
+models/
+
+# Python caches
+__pycache__/
+*.py[cod]

@@ -1,0 +1,22 @@
+# Python dependencies for the hand-teleop project.
+#
+# Install into the project's existing virtualenv (the one where LeRobot is installed):
+#     source ../.venv/bin/activate           # from inside hand_teleop/
+#     pip install -r requirements.txt
+#
+# IMPORTANT (OpenCV window): LeRobot installs `opencv-python-headless`, which has NO GUI and cannot
+# show the camera window. `mediapipe` pulls in `opencv-contrib-python` (a GUI-capable superset), so to
+# avoid two conflicting cv2 builds, uninstall the headless one first:
+#     pip uninstall -y opencv-python-headless
+#     pip install -r requirements.txt
+#
+# LeRobot itself is NOT listed here: it is provided by the `lerobot/` git submodule, installed via
+#     pip install -e "../lerobot[feetech]"
+
+# NOTE: the hand-landmark model bundle (~7.5 MB) is downloaded automatically on first run and cached
+# under hand_teleop/models/ (needs internet once).
+mediapipe>=0.10.18        # hand landmark detection (also installs opencv-contrib-python, numpy, etc.)
+
+# opencv-contrib-python is pulled in by mediapipe and provides a GUI-capable `cv2` (imshow).
+# Listed explicitly so it is not accidentally replaced by the headless build.
+opencv-contrib-python>=4.9
