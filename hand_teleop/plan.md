@@ -72,12 +72,14 @@ the gripper is `[0, 100]`.
 
 ### Task 9 — 3D URDF viewer ✅ (added after Day-2 feedback)
 - [x] 9.1 `urdf_assets.py`: download + cache the official SO-101 URDF + meshes (SO-ARM100).
-- [x] 9.2 `net.py`: UDP `JointStatePublisher` + receiver (decouples viewer from the control loop).
-- [x] 9.3 `urdf_viewer.py`: `yourdfpy` viewer process; map normalized values onto URDF joint limits.
-- [x] 9.4 App spawns the viewer subprocess and streams joint states when `--urdf-view` is set.
+- [x] 9.2 `urdf_viewer.py`: browser-based 3D viewer using **viser** (WebGL) — robust on macOS, unlike
+  native pyglet/trimesh windows. Maps normalized values onto URDF joint limits.
+- [x] 9.3 App runs the viser viewer **in-process** (background thread) and updates it each frame when
+  `--urdf-view` is set; user opens http://localhost:8080.
+- [x] 9.4 `net.py`: UDP transport kept for driving the standalone viewer from another process/machine.
 - [x] 9.5 Widen mapping ranges + add per-joint active input slice (`in_lo`/`in_hi`) so joints reach
   their full range (fixes "can't go down / can't reach max").
-- [x] 9.6 `tests/test_urdf_viewer.py`: radian mapping, invert, clamping, UDP round-trip, URDF load.
+- [x] 9.6 `tests/test_urdf_viewer.py`: radian mapping, invert, clamping, UDP round-trip, viser load.
 
 ### Task 10 — Whole-arm tracking (future)
 - [ ] 10.1 Add a `PoseArmDetector` (MediaPipe Pose: shoulder→elbow→wrist) behind the `HandDetector`

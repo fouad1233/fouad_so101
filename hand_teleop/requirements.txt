@@ -21,6 +21,8 @@ mediapipe>=0.10.18        # hand landmark detection (also installs opencv-contri
 # Listed explicitly so it is not accidentally replaced by the headless build.
 opencv-contrib-python>=4.9
 
-# Optional: real 3D URDF viewer (the --urdf-view flag). Loads the official SO-101 URDF.
+# Optional: real 3D URDF viewer (the --urdf-view flag). Loads the official SO-101 URDF and renders it
+# in your browser via viser (WebGL) — robust on macOS, no native OpenGL/pyglet window needed.
 # The URDF + meshes are auto-downloaded on first use and cached in hand_teleop/urdf_so101/.
 yourdfpy>=0.0.56
+viser>=1.0.0

@@ -139,11 +139,11 @@ class RobotConfig:
 
 @dataclass
 class UrdfViewConfig:
-    """Optional 3D URDF viewer (separate process, fed joint states over local UDP)."""
+    """Optional 3D URDF viewer (browser-based, served in-process by viser)."""
 
     enabled: bool = False
-    host: str = "127.0.0.1"
-    port: int = 50607
+    web_host: str = "127.0.0.1"
+    web_port: int = 8080
     # If a joint appears to move the opposite way in the 3D view, add its name here.
     invert_joints: tuple[str, ...] = ()
 

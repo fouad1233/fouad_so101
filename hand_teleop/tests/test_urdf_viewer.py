@@ -83,21 +83,25 @@ def test_udp_roundtrip():
         sock.close()
 
 
-def test_urdf_loads_if_available():
+def test_urdf_viewer_loads_if_available():
     try:
+        import viser  # noqa: F401
         import yourdfpy  # noqa: F401
         from hand_teleop.urdf_viewer import UrdfViewer
     except ImportError:
-        print("  (skipped: yourdfpy not installed)")
+        print("  (skipped: viser/yourdfpy not installed)")
         return
     try:
-        viewer = UrdfViewer()
-    except Exception as e:  # e.g. no network to download the URDF
+        viewer = UrdfViewer(web_port=8137)  # off the default port to avoid clashing with a live app
+    except Exception as e:  # e.g. no network to download the URDF, or port busy
         print(f"  (skipped UrdfViewer load: {type(e).__name__}: {e})")
         return
-    viewer.apply({m: (50.0 if m == "gripper" else 50.0) for m in MOTORS})
-    viewer.apply({m: (0.0 if m != "gripper" else 50.0) for m in MOTORS})
-    print("  UrdfViewer loaded and applied poses OK")
+    try:
+        viewer.apply({m: (50.0 if m == "gripper" else 50.0) for m in MOTORS})
+        viewer.apply({m: (0.0 if m != "gripper" else 50.0) for m in MOTORS})
+        print("  UrdfViewer (viser) loaded + applied poses OK; url:", viewer.url)
+    finally:
+        viewer.stop()
 
 
 def _run_all():

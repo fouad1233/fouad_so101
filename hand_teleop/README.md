@@ -79,21 +79,25 @@ you calibrated with.
 
 ### 3) Real 3D URDF view (accurate joint visualization)
 
-Add `--urdf-view` to open a second window with the **official SO-101 URDF** rendered in 3D, following
-the joints (far more accurate than the lightweight 2D schematic in the camera window):
+Add `--urdf-view` to render the **official SO-101 URDF** in 3D, following the real joints (far more
+accurate than the lightweight 2D schematic in the camera window):
 
 ```bash
-python -m hand_teleop --urdf-view                 # simulation + 3D URDF window
+python -m hand_teleop --urdf-view                 # simulation + 3D URDF view
 python -m hand_teleop --urdf-view --port /dev/tty.usbmodem5B421352311 --id my_follower
 ```
 
+Then **open the printed URL (http://localhost:8080) in your browser** — the model moves with your hand.
+
+- The viewer is **browser-based** (rendered with [viser](https://github.com/nerfstudio-project/viser),
+  WebGL). This is deliberately *not* a native OpenGL window: native viewers (pyglet/trimesh) are
+  unreliable on macOS, whereas a browser tab just works. The viser server runs **in-process** on a
+  background thread, so it never interferes with the camera window or the control loop.
 - The URDF + meshes (TheRobotStudio/SO-ARM100) are **downloaded once** to `hand_teleop/urdf_so101/`.
-- The viewer runs as a **separate process**, fed joint states over a local UDP socket, so it never
-  interferes with the camera window or the control loop.
-- You can also run it on its own (it just waits for joint states): `python -m hand_teleop.urdf_viewer`.
 - Normalized joint values are mapped onto each URDF joint's limits, so the model spans the real range.
-  Registration to the arm's exact zero is approximate; if a joint rotates the *wrong way*, run the
-  viewer with e.g. `python -m hand_teleop.urdf_viewer --invert shoulder_pan,wrist_roll`.
+  Registration to the arm's exact zero is approximate; if a joint rotates the *wrong way*, set its name
+  in `UrdfViewConfig.invert_joints` (or run the standalone viewer
+  `python -m hand_teleop.urdf_viewer --invert shoulder_pan,wrist_roll`).
 
 ### Controls (in the window)
 
@@ -173,8 +177,9 @@ headless pipeline run (mock hand → mapper → smoother → simulated robot) �
 - **A joint rotates the wrong way in the 3D view** — `python -m hand_teleop.urdf_viewer --invert <joint>`
   (or set `UrdfViewConfig.invert_joints`). To flip the *commanded* direction on the real arm instead,
   toggle that joint's `invert` in `MappingConfig`.
-- **3D window doesn't open** — ensure `yourdfpy` is installed (`pip install -r requirements.txt`); the
-  first run also needs internet to download the URDF/meshes.
+- **3D view doesn't show** — it's a browser view: open the printed URL (http://localhost:8080). Ensure
+  `viser` and `yourdfpy` are installed (`pip install -r requirements.txt`); the first run also needs
+  internet to download the URDF/meshes. If port 8080 is busy, change `UrdfViewConfig.web_port`.
 
 ---
 
@@ -204,9 +209,9 @@ hand_teleop/
 
 - The **camera window** always draws a lightweight **2D schematic** (no extra deps) for at-a-glance
   feedback.
-- Adding **`--urdf-view`** opens the accurate **3D URDF** model (the official
-  [SO-ARM100](https://github.com/TheRobotStudio/SO-ARM100) SO-101 URDF via `yourdfpy`), driven by the
-  same joint targets over UDP.
+- Adding **`--urdf-view`** renders the accurate **3D URDF** model (the official
+  [SO-ARM100](https://github.com/TheRobotStudio/SO-ARM100) SO-101 URDF) in your browser via `viser`,
+  driven by the same joint targets.
 
 ## Future: whole-arm (body) tracking
 
