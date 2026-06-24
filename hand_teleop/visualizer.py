@@ -52,9 +52,14 @@ class Visualizer:
 
     # --- hand / arm skeleton --------------------------------------------
     def _draw_hand(self, frame: np.ndarray, det: HandDetection) -> None:
-        pts = det.landmarks_px
+        self._draw_skeleton(frame, det.landmarks_px, det.connections)
+        for pts, conns in det.overlays:  # e.g. the full 5-finger hand in arm mode
+            self._draw_skeleton(frame, pts, conns)
+
+    @staticmethod
+    def _draw_skeleton(frame, pts, connections) -> None:
         n = len(pts)
-        for a, b in det.connections:
+        for a, b in connections:
             if a < n and b < n:
                 cv2.line(frame, tuple(pts[a]), tuple(pts[b]), CYAN, 2, cv2.LINE_AA)
         for x, y in pts:

@@ -134,6 +134,9 @@ class PoseConfig:
     side: str = "auto"           # "auto" | "left" | "right" (the person's arm to follow)
     min_detection_confidence: float = 0.6
     min_tracking_confidence: float = 0.6
+    # Pose always *guesses* occluded joints, so reject a detection unless the shoulder/elbow/wrist
+    # are actually visible enough. Raise this if it tracks a phantom arm when yours is out of frame.
+    min_visibility: float = 0.6
     # pan/lift come from the wrist position relative to the shoulder, normalized by arm length.
     # ~1.3 means a comfortable (not fully extended) arm sweep already spans the joint range.
     pan_gain: float = 1.3

@@ -54,3 +54,5 @@ class HandDetection:
     landmarks_px: np.ndarray              # (N, 2) pixel coordinates for drawing
     handedness: str | None = None        # "Left" / "Right" / None
     connections: tuple[tuple[int, int], ...] = HAND_CONNECTIONS  # topology for drawing
+    # extra skeletons to draw on top, e.g. the full hand in arm mode: each is (points_px, connections)
+    overlays: tuple[tuple[np.ndarray, tuple[tuple[int, int], ...]], ...] = ()

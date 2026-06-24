@@ -93,6 +93,9 @@ the gripper is `[0, 100]`.
 - [x] 11.1 `CombinedArmHandDetector`: Pose (arm: pan/lift/elbow/wrist_flex) + Hands (precise
   `wrist_roll` + `gripper`) run together. Wired to `--track arm`. Holds last gripper/roll if the hand
   is momentarily not visible.
+- [x] 11.2 Draw the full 5-finger hand (21 landmarks) on top of the arm skeleton (overlays).
+- [x] 11.3 Reject phantom-arm detections via landmark visibility (`PoseConfig.min_visibility`).
+- [x] 11.4 Per-joint direction flip via `--invert-joints` (default flips `elbow_flex`, i.e. joint 3).
 
 ### Task 8 — Docs ✅
 - [x] 8.1 `requirements.txt` (Python dependencies).

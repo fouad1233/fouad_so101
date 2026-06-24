@@ -24,6 +24,11 @@ def build_config(args: argparse.Namespace) -> AppConfig:
     cfg.urdf_view.enabled = args.urdf_view
     cfg.track = args.track
     cfg.pose.side = args.arm_side
+    # Flip the command direction of any listed joints (e.g. elbow_flex by default).
+    for name in (j.strip() for j in args.invert_joints.split(",")):
+        if name in cfg.mapping.joint_maps:
+            jm = cfg.mapping.joint_maps[name]
+            jm.invert = not jm.invert
     if args.ema_alpha is not None:
         cfg.smoothing.ema_alpha = args.ema_alpha
     if args.max_step is not None:
@@ -45,6 +50,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="Track your hand (MediaPipe Hands) or your whole arm (MediaPipe Pose).")
     p.add_argument("--arm-side", choices=["auto", "left", "right"], default="auto",
                    help="Which arm to follow in --track arm mode (default: auto).")
+    p.add_argument("--invert-joints", default="elbow_flex",
+                   help="Comma-separated joints whose direction to flip (default: elbow_flex). "
+                        "Pass '' for none, or e.g. 'elbow_flex,shoulder_pan'.")
     p.add_argument("--camera", type=int, default=0, help="Webcam index (default: 0).")
     p.add_argument("--max-relative-target", type=float, default=12.0,
                    help="Max per-command joint change, normalized units (safety cap; default: 12).")

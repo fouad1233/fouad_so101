@@ -38,9 +38,17 @@ natural range than hand-only:
 | Open / close thumb–index pinch            | `gripper`        |
 
 In `--track arm` mode the big joints (pan / lift / elbow / wrist_flex) come from **Pose**, while
-`wrist_roll` and `gripper` come from **Hands** running at the same time — so hand open/close controls
-the gripper just like in hand mode. Keep your hand visible to the camera; if it's momentarily lost the
-last gripper/roll value is held.
+`wrist_roll` and `gripper` come from **Hands** running at the same time (the full 5-finger hand is drawn
+on top of the arm skeleton) — so hand open/close controls the gripper just like in hand mode. Keep your
+hand visible; if it's momentarily lost the last gripper/roll value is held.
+
+Notes:
+- `elbow_flex` (joint 3) is **inverted by default** so the robot elbow matches your elbow. Change which
+  joints are flipped with `--invert-joints` (e.g. `--invert-joints ""` for none, or
+  `--invert-joints elbow_flex,shoulder_pan`).
+- Pose always *guesses* occluded joints, so a detection is ignored unless your shoulder/elbow/wrist are
+  actually visible (`PoseConfig.min_visibility`, default 0.6) — this stops it tracking a phantom arm
+  when yours is out of frame.
 
 ---
 
@@ -138,6 +146,7 @@ Then **open the printed URL (http://localhost:8080) in your browser** — the mo
 --id ID                     calibration id (default: my_follower)
 --track hand|arm            track your hand or your whole arm (default: hand)
 --arm-side auto|left|right   which arm to follow in --track arm (default: auto)
+--invert-joints LIST        flip a joint's direction (default: elbow_flex; '' = none)
 --camera N                  webcam index (default: 0)
 --max-relative-target F     per-command joint cap, normalized units (default: 12) — lower = gentler
 --ema-alpha F               smoothing 0..1, higher = snappier (default: 0.35)

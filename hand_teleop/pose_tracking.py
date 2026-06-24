@@ -155,6 +155,12 @@ class PoseArmDetector(HandDetector):
 
         side = self._pick_side(lm, vis)
         idx = _SIDES[side]
+
+        # Reject phantom arms: Pose guesses occluded joints, so require the arm to be actually visible.
+        arm_vis = vis[[idx["shoulder"], idx["elbow"], idx["wrist"]]].min()
+        if arm_vis < self._cfg.min_visibility:
+            return None
+
         pts = {role: lm[i] for role, i in idx.items()}
 
         features = compute_arm_features(
@@ -195,15 +201,19 @@ class CombinedArmHandDetector(HandDetector):
         if arm is None:
             return None
         hand = self._hand.detect(frame_bgr)
+        overlays: tuple = ()
         if hand is not None:
             self._last_pinch = hand.features.pinch
             self._last_roll = hand.features.roll
+            # draw the full 21-point (5-finger) hand on top of the arm skeleton
+            overlays = ((hand.landmarks_px, hand.connections),)
         merged = replace(arm.features, pinch=self._last_pinch, roll=self._last_roll)
         return HandDetection(
             features=merged,
             landmarks_px=arm.landmarks_px,
             handedness=arm.handedness,
             connections=arm.connections,
+            overlays=overlays,
         )
 
     def close(self) -> None:
