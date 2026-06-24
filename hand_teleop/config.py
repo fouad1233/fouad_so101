@@ -134,9 +134,10 @@ class PoseConfig:
     side: str = "auto"           # "auto" | "left" | "right" (the person's arm to follow)
     min_detection_confidence: float = 0.6
     min_tracking_confidence: float = 0.6
-    # pan/lift come from the wrist position *relative to the shoulder* (robust to where you stand).
-    pan_gain: float = 1.9
-    lift_gain: float = 1.9
+    # pan/lift come from the wrist position relative to the shoulder, normalized by arm length.
+    # ~1.3 means a comfortable (not fully extended) arm sweep already spans the joint range.
+    pan_gain: float = 1.3
+    lift_gain: float = 1.3
     # elbow extension from the interior elbow angle (radians): bent -> 0, straight -> 1.
     elbow_bent_rad: float = 0.7      # ~40 deg
     elbow_straight_rad: float = 2.9  # ~166 deg

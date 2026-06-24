@@ -64,9 +64,14 @@ def compute_arm_features(
     cfg: PoseConfig,
 ) -> HandFeatures:
     """Derive the six normalized features from 2D arm landmarks. Pure -> unit-testable."""
-    # pan / lift: wrist position relative to the shoulder (recentred to ~0.5).
-    x = _clamp(0.5 + (wrist[0] - shoulder[0]) * cfg.pan_gain, 0.0, 1.0)
-    y = _clamp(0.5 + (wrist[1] - shoulder[1]) * cfg.lift_gain, 0.0, 1.0)
+    # pan / lift: wrist position relative to the shoulder, normalized by the *arm length* so it is
+    # scale-invariant (robust to how close you stand) and doesn't saturate. A fully extended arm to
+    # the side/up moves the wrist by ~one arm length, which maps to the end of the range.
+    arm_len = float(np.linalg.norm(elbow - shoulder) + np.linalg.norm(wrist - elbow)) or 1e-6
+    dx = (wrist[0] - shoulder[0]) / arm_len
+    dy = (wrist[1] - shoulder[1]) / arm_len
+    x = _clamp(0.5 + 0.5 * cfg.pan_gain * dx, 0.0, 1.0)
+    y = _clamp(0.5 + 0.5 * cfg.lift_gain * dy, 0.0, 1.0)
 
     # elbow extension from the interior angle at the elbow.
     v1 = shoulder - elbow
