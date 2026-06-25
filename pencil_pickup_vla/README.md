@@ -102,7 +102,13 @@ instead of pulling from the Hub.
 
 ## Stage 3 — fine-tune SmolVLA on Kaggle
 
-Open **`2_kaggle_finetune_smolvla.ipynb`** on Kaggle (New Notebook → File → Import, or upload it):
+Get the notebook onto Kaggle (no copy-paste) either way:
+- **Web:** kaggle.com → Create → New Notebook → **File → Import Notebook → Upload** → pick
+  `2_kaggle_finetune_smolvla.ipynb`.
+- **Terminal:** `./push_notebook_to_kaggle.sh` (uses the Kaggle CLI + `kernel-metadata.json`, which
+  pre-enables GPU + Internet). Needs a one-time `~/.kaggle/kaggle.json` token.
+
+Then on Kaggle:
 
 1. **Settings → Accelerator → GPU** (T4 x2 or P100), and **Internet → On**.
 2. **Add-ons → Secrets** → add `HF_TOKEN` (your HF write token).
