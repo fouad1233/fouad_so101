@@ -31,7 +31,7 @@ faster/cheaper** and fits on a free Kaggle T4 — ideal for a single task with a
 cd pencil_pickup_vla
 cp config.env.example config.env      # then edit config.env with your values
 ./setup_local.sh                      # installs lerobot[feetech,dataset,smolvla] into ../.venv
-huggingface-cli login                 # paste a HF token (write scope)
+hf auth login                 # paste a HF token (write scope)
 ./find_camera.sh                      # note your camera index -> set CAMERA_INDEX in config.env
 ```
 
@@ -50,13 +50,14 @@ on it.
 You teleoperate (move the **leader**, the **follower** mirrors) while the camera + joint positions are
 recorded. Keyboard controls while recording:
 
-| Key | Action |
-|---|---|
-| **→ Right arrow** | finish this episode, go to next |
-| **← Left arrow** | discard & re-record this episode |
-| **Esc** | stop and save |
+| Key                      | Action                           |
+| ------------------------ | -------------------------------- |
+| **→ Right arrow** | finish this episode, go to next  |
+| **← Left arrow**  | discard & re-record this episode |
+| **Esc**            | stop and save                    |
 
 **How to get a dataset that actually works** (this matters more than anything else):
+
 - **~50 episodes** to start (set by `NUM_EPISODES`). More varied data → better policy.
 - **Vary the pen's start position/orientation** every episode (left, right, near, far, angled). Also
   vary where on the pad you place it. This teaches generalization instead of one memorized trajectory.
@@ -66,6 +67,14 @@ recorded. Keyboard controls while recording:
 
 The dataset is pushed to `https://huggingface.co/datasets/<HF_USER>/so101_pencil_pickup`.
 Inspect it: `lerobot-dataset-viz --repo-id=$DATASET_REPO`.
+
+> **Your data is saved locally first.** Every episode is written to
+> `~/.cache/huggingface/lerobot/<repo_id>/` *during* recording; the Hub push only happens at the end.
+> So if the final push ever fails (wrong `HF_USER`, network blip…), **nothing is lost** — just run:
+> ```bash
+> ./recover_push_dataset.sh
+> ```
+> It finds your newest local dataset and pushes it to `$DATASET_REPO`.
 
 ---
 
@@ -85,6 +94,7 @@ kaggle datasets init -p "$DS"
 # edit "$DS/dataset-metadata.json" (set a title + id), then:
 kaggle datasets create -p "$DS" --dir-mode zip
 ```
+
 Then attach that Kaggle dataset to the notebook and pass `--dataset.root=/kaggle/input/<your-ds>`
 instead of pulling from the Hub.
 
@@ -101,6 +111,7 @@ Open **`2_kaggle_finetune_smolvla.ipynb`** on Kaggle (New Notebook → File → 
    `<HF_USER>/smolvla_pencil_pickup`.
 
 The training command it runs (for reference):
+
 ```bash
 lerobot-train \
   --policy.path=lerobot/smolvla_base \
@@ -111,6 +122,7 @@ lerobot-train \
 ```
 
 **Kaggle time/GPU reality:**
+
 - A T4 is far slower than the A100 in the docs (~4 h for 20k steps on A100). On a T4 expect it to be
   slow and possibly hit the **12 h session limit** and the **~30 h/week** GPU quota.
 - So: keep `BATCH_SIZE` small (8–16, or it OOMs), **start with `STEPS=10000`** to validate the whole
@@ -151,15 +163,16 @@ supports a real-time-chunking mode for low-power hardware — add these flags in
 
 ## Files
 
-| File | Purpose |
-|---|---|
-| `config.env.example` | copy to `config.env`; all your settings (ports, camera, repos, task) |
-| `setup_local.sh` | install the LeRobot extras needed to record + run locally |
-| `find_camera.sh` | list cameras → get `CAMERA_INDEX` |
-| `1_record_dataset.sh` | record teleoperated demos → push dataset to the Hub |
-| `2_kaggle_finetune_smolvla.ipynb` | Kaggle GPU notebook: fine-tune SmolVLA, push model to the Hub |
-| `3_run_autonomous.sh` | run the fine-tuned policy on the real arm |
+| File                                | Purpose                                                               |
+| ----------------------------------- | --------------------------------------------------------------------- |
+| `config.env.example`              | copy to`config.env`; all your settings (ports, camera, repos, task) |
+| `setup_local.sh`                  | install the LeRobot extras needed to record + run locally             |
+| `find_camera.sh`                  | list cameras → get`CAMERA_INDEX`                                   |
+| `1_record_dataset.sh`             | record teleoperated demos → push dataset to the Hub                  |
+| `2_kaggle_finetune_smolvla.ipynb` | Kaggle GPU notebook: fine-tune SmolVLA, push model to the Hub         |
+| `3_run_autonomous.sh`             | run the fine-tuned policy on the real arm                             |
 
 ## References (in the LeRobot submodule docs)
+
 - `../lerobot/docs/source/il_robots.mdx` — recording datasets
 - `../lerobot/docs/source/smolvla.mdx` — SmolVLA fine-tuning & rollout

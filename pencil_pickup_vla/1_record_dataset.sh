@@ -11,6 +11,15 @@ cd "$(dirname "$0")"
 source ./config.env
 source ../.venv/bin/activate
 
+# Fail fast (BEFORE recording) if the HF username is still the placeholder, otherwise the Hub push
+# at the very end fails and it looks like the data was lost (it isn't — it's saved locally first).
+if [ "$HF_USER" = "your-hf-username" ]; then
+  echo "ERROR: set HF_USER in config.env to your real Hugging Face username first." >&2
+  exit 1
+fi
+# Confirm you're logged in so the end-of-recording push succeeds.
+hf auth whoami >/dev/null 2>&1 || { echo "ERROR: run 'hf auth login' first." >&2; exit 1; }
+
 lerobot-record \
   --robot.type=so101_follower \
   --robot.port="$FOLLOWER_PORT" \
