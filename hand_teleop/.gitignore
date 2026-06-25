@@ -1,0 +1,9 @@
+# Downloaded MediaPipe model bundle (auto-fetched on first run)
+models/
+
+# Downloaded SO-101 URDF + meshes (auto-fetched on first run)
+urdf_so101/
+
+# Python caches
+__pycache__/
+*.py[cod]

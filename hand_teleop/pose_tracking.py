@@ -1,0 +1,240 @@
+"""Whole-arm detection: webcam frame -> normalized features from your shoulder/elbow/wrist.
+
+Implements the same :class:`HandDetector` contract as the hand tracker, so the mapper, smoother,
+safety and URDF viewer are all reused unchanged. The arm drives the joints like this:
+
+* wrist position relative to your shoulder  -> base pan + shoulder lift,
+* your actual elbow bend                    -> robot elbow,
+* forearm up/down                           -> wrist flex,
+* hand knuckle line / thumb-index (coarse)  -> wrist roll + gripper.
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import time
+from dataclasses import replace
+from pathlib import Path
+
+import numpy as np
+
+from .config import PoseConfig, TrackingConfig
+from .download import fetch
+from .features import ARM_CONNECTIONS, HandDetection, HandFeatures
+from .hand_tracking import HandDetector, MediaPipeHandDetector  # reuse the ABC + hand backend
+
+logger = logging.getLogger(__name__)
+
+# MediaPipe Pose landmark indices (per the person's own left/right).
+_SIDES = {
+    "left": dict(shoulder=11, elbow=13, wrist=15, pinky=17, index=19, thumb=21),
+    "right": dict(shoulder=12, elbow=14, wrist=16, pinky=18, index=20, thumb=22),
+}
+_VARIANTS = {0: "lite", 1: "full", 2: "heavy"}
+_MODEL_DIR = Path(__file__).parent / "models"
+
+
+def _clamp(v: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, v))
+
+
+def ensure_pose_model(complexity: int = 1) -> Path:
+    variant = _VARIANTS.get(complexity, "full")
+    path = _MODEL_DIR / f"pose_landmarker_{variant}.task"
+    if path.exists() and path.stat().st_size > 0:
+        return path
+    url = (
+        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
+        f"pose_landmarker_{variant}/float16/1/pose_landmarker_{variant}.task"
+    )
+    logger.info("Downloading MediaPipe pose model (%s) ...", variant)
+    fetch(url, path)
+    logger.info("Pose model downloaded (%.1f MB).", path.stat().st_size / 1e6)
+    return path
+
+
+def compute_arm_features(
+    shoulder: np.ndarray,
+    elbow: np.ndarray,
+    wrist: np.ndarray,
+    cfg: PoseConfig,
+    world: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
+) -> HandFeatures:
+    """Anthropomorphic mapping that matches the SO-101's serial DOFs. Pure -> unit-testable.
+
+    ``shoulder/elbow/wrist`` are 2D image points (for pan/lift/pitch). ``world`` is the optional
+    3D (shoulder, elbow, wrist) for a foreshortening-free elbow angle.
+
+    The serial arm is decoupled like the robot: the **shoulder** orients the *upper arm*
+    (shoulder->elbow) for pan+lift, the **elbow** is the true bend angle, and the wrist is the hand.
+    Bending your elbow therefore no longer moves pan/lift.
+    """
+    # --- shoulder pan + lift from the UPPER ARM direction (shoulder -> elbow) ---
+    # Direction cosines of the upper arm: x = left/right lean, y = up/down (image y is down).
+    ua = elbow - shoulder
+    ua_len = float(np.linalg.norm(ua)) or 1e-6
+    x = _clamp(0.5 + 0.5 * cfg.pan_gain * (ua[0] / ua_len), 0.0, 1.0)
+    y = _clamp(0.5 + 0.5 * cfg.lift_gain * (ua[1] / ua_len), 0.0, 1.0)
+
+    # --- elbow flex from the true interior angle (3D world coords when available) ---
+    s, e, w = world if world is not None else (shoulder, elbow, wrist)
+    v1 = np.asarray(s, dtype=np.float64) - np.asarray(e, dtype=np.float64)
+    v2 = np.asarray(w, dtype=np.float64) - np.asarray(e, dtype=np.float64)
+    denom = float(np.linalg.norm(v1) * np.linalg.norm(v2)) or 1e-6
+    angle = math.acos(_clamp(float(np.dot(v1, v2)) / denom, -1.0, 1.0))  # straight ~ pi, bent ~ 0
+    depth = _clamp((angle - cfg.elbow_bent_rad) / (cfg.elbow_straight_rad - cfg.elbow_bent_rad), 0.0, 1.0)
+
+    # --- wrist flex from forearm pitch (2D image; up = positive) ---
+    fore = wrist - elbow
+    fore_len = float(np.linalg.norm(fore)) or 1e-6
+    pitch = _clamp(-(fore[1]) / fore_len * cfg.pitch_gain, -1.0, 1.0)
+
+    # roll & gripper come from the Hands model in combined mode; neutral placeholders here.
+    return HandFeatures(x=x, y=y, depth=depth, roll=0.0, pitch=pitch, pinch=0.5)
+
+
+class PoseArmDetector(HandDetector):
+    """Arm landmark detection backed by the MediaPipe Tasks ``PoseLandmarker`` (VIDEO mode)."""
+
+    def __init__(self, cfg: PoseConfig, model_path: Path | None = None):
+        try:
+            import mediapipe as mp
+            from mediapipe.tasks import python as mp_python
+            from mediapipe.tasks.python import vision as mp_vision
+        except ImportError as e:  # pragma: no cover
+            raise ImportError(
+                "mediapipe is required for arm tracking. Install it with:\n"
+                "  pip install -r hand_teleop/requirements.txt"
+            ) from e
+
+        self._mp = mp
+        self._cfg = cfg
+        model = model_path or ensure_pose_model(cfg.complexity)
+        options = mp_vision.PoseLandmarkerOptions(
+            base_options=mp_python.BaseOptions(model_asset_path=str(model)),
+            running_mode=mp_vision.RunningMode.VIDEO,
+            num_poses=1,
+            min_pose_detection_confidence=cfg.min_detection_confidence,
+            min_pose_presence_confidence=cfg.min_detection_confidence,
+            min_tracking_confidence=cfg.min_tracking_confidence,
+        )
+        self._landmarker = mp_vision.PoseLandmarker.create_from_options(options)
+        self._t0 = time.perf_counter()
+        self._last_ts = -1
+
+    def _pick_side(self, lm: np.ndarray, vis: np.ndarray) -> str:
+        if self._cfg.side in _SIDES:
+            return self._cfg.side
+        # auto: choose the arm whose shoulder/elbow/wrist are most visible
+        def score(side: str) -> float:
+            idx = _SIDES[side]
+            return float(vis[[idx["shoulder"], idx["elbow"], idx["wrist"]]].sum())
+
+        return "right" if score("right") >= score("left") else "left"
+
+    def detect(self, frame_bgr: np.ndarray) -> HandDetection | None:
+        h, w = frame_bgr.shape[:2]
+        rgb = np.ascontiguousarray(frame_bgr[:, :, ::-1])
+        mp_image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=rgb)
+
+        ts = int((time.perf_counter() - self._t0) * 1000)
+        if ts <= self._last_ts:
+            ts = self._last_ts + 1
+        self._last_ts = ts
+
+        result = self._landmarker.detect_for_video(mp_image, ts)
+        if not result.pose_landmarks:
+            return None
+
+        pl = result.pose_landmarks[0]
+        lm = np.array([[p.x, p.y] for p in pl], dtype=np.float64)
+        vis = np.array([getattr(p, "visibility", 1.0) for p in pl], dtype=np.float64)
+
+        side = self._pick_side(lm, vis)
+        idx = _SIDES[side]
+        pts = {role: lm[i] for role, i in idx.items()}
+
+        # Reject phantom arms: when your arm is out of shot, Pose extrapolates the joints off-screen.
+        m = self._cfg.bounds_margin
+        for role in ("elbow", "wrist"):
+            px, py = pts[role]
+            if not (-m <= px <= 1.0 + m and -m <= py <= 1.0 + m):
+                return None
+
+        # Optional, stricter visibility gate (off by default; scores are flaky for occluded poses).
+        if self._cfg.min_visibility > 0.0:
+            if vis[[idx["shoulder"], idx["elbow"], idx["wrist"]]].min() < self._cfg.min_visibility:
+                return None
+
+        # 3D world landmarks give a foreshortening-free elbow angle (true axis).
+        world = None
+        wls = getattr(result, "pose_world_landmarks", None)
+        if wls:
+            wl = np.array([[p.x, p.y, p.z] for p in wls[0]], dtype=np.float64)
+            world = (wl[idx["shoulder"]], wl[idx["elbow"]], wl[idx["wrist"]])
+
+        features = compute_arm_features(
+            pts["shoulder"], pts["elbow"], pts["wrist"], self._cfg, world=world,
+        )
+
+        # Arm skeleton for drawing: just [shoulder, elbow, wrist]. The hand is drawn separately from
+        # the real 21-point Hands model (the coarse pose hand points were confusing and unused here).
+        order = ["shoulder", "elbow", "wrist"]
+        skel = np.array([[pts[r][0] * w, pts[r][1] * h] for r in order], dtype=np.int32)
+        return HandDetection(
+            features=features,
+            landmarks_px=skel,
+            handedness=side.capitalize(),
+            connections=ARM_CONNECTIONS,
+        )
+
+    def close(self) -> None:
+        self._landmarker.close()
+
+
+class CombinedArmHandDetector(HandDetector):
+    """Arm joints from Pose + a reliable gripper/roll from Hands, run together each frame.
+
+    The whole arm drives pan/lift/elbow/wrist_flex; your hand's pinch drives the **gripper** and your
+    hand roll drives **wrist_roll** (both far better than the coarse pose hand points). If the hand
+    isn't visible on a frame, the last gripper/roll values are held.
+    """
+
+    def __init__(self, pose_cfg: PoseConfig, hand_cfg: TrackingConfig):
+        self._pose = PoseArmDetector(pose_cfg)
+        self._hand = MediaPipeHandDetector(hand_cfg)
+        self._last_pinch = 0.5
+        self._last_roll = 0.0
+
+    def detect(self, frame_bgr: np.ndarray) -> HandDetection | None:
+        arm = self._pose.detect(frame_bgr)
+        if arm is None:
+            return None
+        hand = self._hand.detect(frame_bgr)
+        overlays: tuple = ()
+        if hand is not None:
+            self._last_pinch = hand.features.pinch
+            self._last_roll = hand.features.roll
+            # draw the full 21-point (5-finger) hand on top of the arm skeleton
+            overlays = ((hand.landmarks_px, hand.connections),)
+        merged = replace(arm.features, pinch=self._last_pinch, roll=self._last_roll)
+        return HandDetection(
+            features=merged,
+            landmarks_px=arm.landmarks_px,
+            handedness=arm.handedness,
+            connections=arm.connections,
+            overlays=overlays,
+        )
+
+    def close(self) -> None:
+        self._pose.close()
+        self._hand.close()
+
+
+__all__ = [
+    "PoseArmDetector",
+    "CombinedArmHandDetector",
+    "compute_arm_features",
+    "ensure_pose_model",
+]
