@@ -105,8 +105,9 @@ instead of pulling from the Hub.
 Get the notebook onto Kaggle (no copy-paste) either way:
 - **Web:** kaggle.com → Create → New Notebook → **File → Import Notebook → Upload** → pick
   `2_kaggle_finetune_smolvla.ipynb`.
-- **Terminal:** `./push_notebook_to_kaggle.sh` (uses the Kaggle CLI + `kernel-metadata.json`, which
-  pre-enables GPU + Internet). Needs a one-time `~/.kaggle/kaggle.json` token.
+- **Terminal:** authenticate once with `kaggle auth login` (browser, no token pasting), then
+  `./push_notebook_to_kaggle.sh` (uses the Kaggle CLI + `kernel-metadata.json`, which pre-enables
+  GPU + Internet). Re-running pushes a new version of the same notebook.
 
 Then on Kaggle:
 
