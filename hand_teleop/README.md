@@ -28,14 +28,19 @@ instead of pushing to the edge of the frame. Re-map or re-scale everything in [`
 With `--track arm` the same joints are driven by your **whole arm** (MediaPipe Pose) — a bigger, more
 natural range than hand-only:
 
-| Your arm movement                         | SO-101 joint     |
-|-------------------------------------------|------------------|
-| Move your hand left / right (vs shoulder) | `shoulder_pan`   |
-| Raise / lower your hand (vs shoulder)     | `shoulder_lift`  |
-| Bend / straighten your **elbow**          | `elbow_flex`     |
-| Point your forearm up / down              | `wrist_flex`     |
-| Rotate your hand                          | `wrist_roll`     |
-| Open / close thumb–index pinch            | `gripper`        |
+| Your arm movement                              | SO-101 joint     |
+|------------------------------------------------|------------------|
+| Swing your **upper arm** left / right          | `shoulder_pan`   |
+| Raise / lower your **upper arm**               | `shoulder_lift`  |
+| Bend / straighten your **elbow** (true 3D angle)| `elbow_flex`    |
+| Point your forearm up / down                   | `wrist_flex`     |
+| Rotate your hand                               | `wrist_roll`     |
+| Open / close thumb–index pinch                 | `gripper`        |
+
+This mirrors the SO-101's serial structure: the **shoulder** (pan+lift) aims the *upper arm*, the
+**elbow** bends the *forearm*, the **wrist** orients the *hand* — so the DOFs are decoupled (bending
+your elbow no longer shifts pan/lift). The elbow angle uses MediaPipe's 3D *world* landmarks, so it's
+correct even when your forearm points toward/away from the camera.
 
 In `--track arm` mode the big joints (pan / lift / elbow / wrist_flex) come from **Pose**, while
 `wrist_roll` and `gripper` come from **Hands** running at the same time (the full 5-finger hand is drawn

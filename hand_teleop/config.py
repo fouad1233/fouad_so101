@@ -141,8 +141,8 @@ class PoseConfig:
     # Optional extra gate on landmark visibility (0 = off; visibility scores are unreliable for
     # self-occluding poses, so it's off by default). Raise toward ~0.5 only if phantom arms persist.
     min_visibility: float = 0.0
-    # pan/lift come from the wrist position relative to the shoulder, normalized by arm length.
-    # ~1.3 means a comfortable (not fully extended) arm sweep already spans the joint range.
+    # pan/lift come from the UPPER ARM direction (shoulder->elbow), decoupled from elbow bend.
+    # The gain scales the direction cosine; ~1.3 spans the joint range before the arm is fully lateral.
     pan_gain: float = 1.3
     lift_gain: float = 1.3
     # elbow extension from the interior elbow angle (radians): bent -> 0, straight -> 1.

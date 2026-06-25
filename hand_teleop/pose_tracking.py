@@ -58,42 +58,40 @@ def compute_arm_features(
     shoulder: np.ndarray,
     elbow: np.ndarray,
     wrist: np.ndarray,
-    thumb: np.ndarray,
-    index: np.ndarray,
-    pinky: np.ndarray,
     cfg: PoseConfig,
+    world: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
 ) -> HandFeatures:
-    """Derive the six normalized features from 2D arm landmarks. Pure -> unit-testable."""
-    # pan / lift: wrist position relative to the shoulder, normalized by the *arm length* so it is
-    # scale-invariant (robust to how close you stand) and doesn't saturate. A fully extended arm to
-    # the side/up moves the wrist by ~one arm length, which maps to the end of the range.
-    arm_len = float(np.linalg.norm(elbow - shoulder) + np.linalg.norm(wrist - elbow)) or 1e-6
-    dx = (wrist[0] - shoulder[0]) / arm_len
-    dy = (wrist[1] - shoulder[1]) / arm_len
-    x = _clamp(0.5 + 0.5 * cfg.pan_gain * dx, 0.0, 1.0)
-    y = _clamp(0.5 + 0.5 * cfg.lift_gain * dy, 0.0, 1.0)
+    """Anthropomorphic mapping that matches the SO-101's serial DOFs. Pure -> unit-testable.
 
-    # elbow extension from the interior angle at the elbow.
-    v1 = shoulder - elbow
-    v2 = wrist - elbow
+    ``shoulder/elbow/wrist`` are 2D image points (for pan/lift/pitch). ``world`` is the optional
+    3D (shoulder, elbow, wrist) for a foreshortening-free elbow angle.
+
+    The serial arm is decoupled like the robot: the **shoulder** orients the *upper arm*
+    (shoulder->elbow) for pan+lift, the **elbow** is the true bend angle, and the wrist is the hand.
+    Bending your elbow therefore no longer moves pan/lift.
+    """
+    # --- shoulder pan + lift from the UPPER ARM direction (shoulder -> elbow) ---
+    # Direction cosines of the upper arm: x = left/right lean, y = up/down (image y is down).
+    ua = elbow - shoulder
+    ua_len = float(np.linalg.norm(ua)) or 1e-6
+    x = _clamp(0.5 + 0.5 * cfg.pan_gain * (ua[0] / ua_len), 0.0, 1.0)
+    y = _clamp(0.5 + 0.5 * cfg.lift_gain * (ua[1] / ua_len), 0.0, 1.0)
+
+    # --- elbow flex from the true interior angle (3D world coords when available) ---
+    s, e, w = world if world is not None else (shoulder, elbow, wrist)
+    v1 = np.asarray(s, dtype=np.float64) - np.asarray(e, dtype=np.float64)
+    v2 = np.asarray(w, dtype=np.float64) - np.asarray(e, dtype=np.float64)
     denom = float(np.linalg.norm(v1) * np.linalg.norm(v2)) or 1e-6
-    angle = math.acos(_clamp(float(np.dot(v1, v2)) / denom, -1.0, 1.0))
+    angle = math.acos(_clamp(float(np.dot(v1, v2)) / denom, -1.0, 1.0))  # straight ~ pi, bent ~ 0
     depth = _clamp((angle - cfg.elbow_bent_rad) / (cfg.elbow_straight_rad - cfg.elbow_bent_rad), 0.0, 1.0)
 
-    # forearm pitch (up = positive).
+    # --- wrist flex from forearm pitch (2D image; up = positive) ---
     fore = wrist - elbow
     fore_len = float(np.linalg.norm(fore)) or 1e-6
     pitch = _clamp(-(fore[1]) / fore_len * cfg.pitch_gain, -1.0, 1.0)
 
-    # roll from the (noisy) knuckle line index -> pinky.
-    vr = pinky - index
-    roll = _clamp(math.atan2(-vr[1], vr[0]) / (math.pi / 2.0), -1.0, 1.0)
-
-    # gripper proxy from thumb-index distance normalized by forearm length.
-    grip_ratio = float(np.linalg.norm(thumb - index)) / fore_len
-    pinch = _clamp((grip_ratio - cfg.pinch_closed) / (cfg.pinch_open - cfg.pinch_closed), 0.0, 1.0)
-
-    return HandFeatures(x=x, y=y, depth=depth, roll=roll, pitch=pitch, pinch=pinch)
+    # roll & gripper come from the Hands model in combined mode; neutral placeholders here.
+    return HandFeatures(x=x, y=y, depth=depth, roll=0.0, pitch=pitch, pinch=0.5)
 
 
 class PoseArmDetector(HandDetector):
@@ -169,9 +167,15 @@ class PoseArmDetector(HandDetector):
             if vis[[idx["shoulder"], idx["elbow"], idx["wrist"]]].min() < self._cfg.min_visibility:
                 return None
 
+        # 3D world landmarks give a foreshortening-free elbow angle (true axis).
+        world = None
+        wls = getattr(result, "pose_world_landmarks", None)
+        if wls:
+            wl = np.array([[p.x, p.y, p.z] for p in wls[0]], dtype=np.float64)
+            world = (wl[idx["shoulder"]], wl[idx["elbow"]], wl[idx["wrist"]])
+
         features = compute_arm_features(
-            pts["shoulder"], pts["elbow"], pts["wrist"],
-            pts["thumb"], pts["index"], pts["pinky"], self._cfg,
+            pts["shoulder"], pts["elbow"], pts["wrist"], self._cfg, world=world,
         )
 
         # Arm skeleton for drawing: just [shoulder, elbow, wrist]. The hand is drawn separately from

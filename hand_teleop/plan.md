@@ -89,6 +89,13 @@ the gripper is `[0, 100]`.
   `--track arm` (+ `--arm-side`) in the CLI.
 - [x] 10.3 `tests/test_pose.py`: arm feature geometry (elbow extension, pan/lift signs, bounds).
 
+### Task 12 — True-axis anthropomorphic mapping ✅
+- [x] 12.1 Decouple DOFs to match the SO-101's serial chain: pan+lift from the **upper arm**
+  (shoulder→elbow) direction, not the wrist — so bending the elbow no longer moves pan/lift.
+- [x] 12.2 Elbow flex from the **true 3D angle** using MediaPipe `pose_world_landmarks`
+  (foreshortening-free).
+- [x] 12.3 Tests: pan/lift decoupled from elbow bend; 3D elbow detects a bend that looks straight in 2D.
+
 ### Task 11 — Combined Pose + Hand ✅
 - [x] 11.1 `CombinedArmHandDetector`: Pose (arm: pan/lift/elbow/wrist_flex) + Hands (precise
   `wrist_roll` + `gripper`) run together. Wired to `--track arm`. Holds last gripper/roll if the hand
