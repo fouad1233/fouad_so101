@@ -19,4 +19,5 @@ lerobot-rollout \
   --task="$TASK" \
   --policy.path="$MODEL_REPO" \
   --policy.device=mps \
+  --rename_map='{"observation.images.front": "observation.images.camera1"}' \
   --display_data=true
